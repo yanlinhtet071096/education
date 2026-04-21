@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import Markdown from 'react-markdown';
+import { CourseDiscussions } from '../components/CourseDiscussions';
 
 export function CoursePlayer() {
   const { courseId, lessonId } = useParams();
@@ -30,10 +31,10 @@ export function CoursePlayer() {
   useEffect(() => {
     const fetchCourseData = async () => {
       setLoading(true);
-      // Step 1: Fetch course
+      // Step 1: Fetch course with profiles
       const { data, error } = await supabase
         .from('courses')
-        .select('*')
+        .select('*, profiles(full_name)')
         .eq('id', courseId)
         .single();
 
@@ -50,23 +51,25 @@ export function CoursePlayer() {
           // Step 3: Fetch lessons
           const moduleIds = moduleData.map(m => m.id);
           if (moduleIds.length > 0) {
-            const fetchLessonsWithFallback = async (cols: string): Promise<any> => {
+            const fetchLessonsData = async () => {
               const { data, error } = await supabase
                 .from('lessons')
-                .select(cols)
+                .select('id, module_id, title, video_url, attachment_url, attachment_type, content, order, is_free')
                 .in('module_id', moduleIds)
                 .order('order', { ascending: true });
               
-              if (error && (error.code === 'PGRST204' || error.message?.includes('column'))) {
-                if (cols.includes('attachment_url')) {
-                  console.warn('Advanced columns missing, retrying with minimal set');
-                  return await fetchLessonsWithFallback('id, module_id, title, content, order, is_free');
-                }
+              if (error && (error.code === '42703' || error.message?.includes('column'))) {
+                const { data: fallbackData } = await supabase
+                  .from('lessons')
+                  .select('id, module_id, title, content, order, is_free')
+                  .in('module_id', moduleIds)
+                  .order('order', { ascending: true });
+                return fallbackData;
               }
-              return { data, error };
+              return data;
             };
 
-            const { data: lessonData, error: lessonError } = await fetchLessonsWithFallback('id, module_id, title, video_url, attachment_url, attachment_type, content, order, is_free');
+            const lessonData = await fetchLessonsData();
 
             if (lessonData) {
               formattedModules = moduleData.map(m => ({
@@ -81,7 +84,11 @@ export function CoursePlayer() {
           }
         }
 
-        setCourse({ ...data, modules: formattedModules });
+        setCourse({ 
+          ...data, 
+          instructor_name: data.profiles?.full_name || 'Expert Instructor',
+          modules: formattedModules 
+        });
 
         // Set current lesson
         const allLessons = formattedModules.flatMap(m => m.lessons);
@@ -261,7 +268,7 @@ export function CoursePlayer() {
                 {[
                   { id: 'overview', label: 'Overview', icon: Info },
                   { id: 'notes', label: 'Notes', icon: ClipboardList },
-                  { id: 'reviews', label: 'Reviews', icon: Star },
+                  { id: 'discussions', label: 'Discussions', icon: MessageSquare },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -363,6 +370,10 @@ export function CoursePlayer() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {activeTab === 'discussions' && (
+                  <CourseDiscussions courseId={courseId!} instructorId={course.instructor_id} />
                 )}
               </div>
             </div>

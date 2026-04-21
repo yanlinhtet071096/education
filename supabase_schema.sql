@@ -83,6 +83,16 @@ CREATE TABLE IF NOT EXISTS public.instructor_earnings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 8. Create Discussions table
+CREATE TABLE IF NOT EXISTS public.course_discussions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  content TEXT NOT NULL,
+  parent_id UUID REFERENCES public.course_discussions(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- ENABLE ROW LEVEL SECURITY
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
@@ -91,6 +101,7 @@ ALTER TABLE public.modules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.instructor_earnings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_discussions ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------
 -- POLICIES (Handled safely with DROP/CREATE)
@@ -191,6 +202,10 @@ CREATE POLICY "Users can view their own enrollments" ON public.enrollments
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
+DROP POLICY IF EXISTS "Users can enroll themselves" ON public.enrollments;
+CREATE POLICY "Users can enroll themselves" ON public.enrollments
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Earnings Policies
 DROP POLICY IF EXISTS "Instructors can view their own earnings" ON public.instructor_earnings;
 CREATE POLICY "Instructors can view their own earnings" ON public.instructor_earnings
@@ -278,3 +293,44 @@ USING (
   auth.role() = 'authenticated' AND
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (role::text = 'instructor' OR role::text = 'admin'))
 );
+
+-- Discussion Policies
+DROP POLICY IF EXISTS "Discussions are viewable by everyone" ON public.course_discussions;
+CREATE POLICY "Discussions are viewable by everyone" ON public.course_discussions
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can post discussions" ON public.course_discussions;
+CREATE POLICY "Authenticated users can post discussions" ON public.course_discussions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own discussions" ON public.course_discussions;
+CREATE POLICY "Users can update their own discussions" ON public.course_discussions
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Private messages table
+CREATE TABLE IF NOT EXISTS public.private_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_id UUID REFERENCES public.profiles(id) NOT NULL,
+  receiver_id UUID REFERENCES public.profiles(id) NOT NULL,
+  course_id UUID REFERENCES public.courses(id) NOT NULL,
+  content TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS for private messages
+ALTER TABLE public.private_messages ENABLE ROW LEVEL SECURITY;
+
+-- Policies for private messages
+DROP POLICY IF EXISTS "Users can view their own private messages" ON public.private_messages;
+CREATE POLICY "Users can view their own private messages" ON public.private_messages
+  FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+DROP POLICY IF EXISTS "Users can send private messages" ON public.private_messages;
+CREATE POLICY "Users can send private messages" ON public.private_messages
+  FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+DROP POLICY IF EXISTS "Receivers can mark messages as read" ON public.private_messages;
+CREATE POLICY "Receivers can mark messages as read" ON public.private_messages
+  FOR UPDATE USING (auth.uid() = receiver_id)
+  WITH CHECK (auth.uid() = receiver_id);

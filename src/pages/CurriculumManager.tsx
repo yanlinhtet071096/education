@@ -44,7 +44,7 @@ interface Lesson {
 export function CurriculumManager() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<Module[]>([]);
@@ -56,6 +56,16 @@ export function CurriculumManager() {
   
   const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
+
+  // Protection: Ensure only the instructor can access this page
+  useEffect(() => {
+    if (user && profile && profile.role === 'student') {
+      navigate('/dashboard/student');
+    }
+    if (course && user && course.instructor_id !== user.id) {
+      navigate(`/course/${courseId}`); // Redirect students back to course detail
+    }
+  }, [course, user, profile, courseId, navigate]);
 
   const fetchData = useCallback(async () => {
     if (!courseId) return;
@@ -132,6 +142,14 @@ export function CurriculumManager() {
     setLoading(true);
     try {
       if (deleteType === 'module') {
+        // Safety: Manual delete lessons in case CASCADE is not active
+        const { error: lessonError } = await supabase
+          .from('lessons')
+          .delete()
+          .eq('module_id', deletingId);
+        
+        if (lessonError) console.warn('Lesson cleanup warning:', lessonError);
+
         const { error } = await supabase
           .from('modules')
           .delete()

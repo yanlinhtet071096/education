@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AuthModal } from './AuthModal';
 
 export function Navbar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isInstructor } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -27,7 +27,9 @@ export function Navbar() {
             {user ? (
               <>
                 <Link to="/dashboard/student" className="text-slate-400 hover:text-white font-medium transition-colors text-sm font-bold uppercase tracking-wider">My Learning</Link>
-                <Link to="/dashboard/instructor" className="text-slate-400 hover:text-white font-medium transition-colors text-sm font-bold uppercase tracking-wider">Teach</Link>
+                {isInstructor && (
+                  <Link to="/dashboard/instructor" className="text-slate-400 hover:text-white font-medium transition-colors text-sm font-bold uppercase tracking-wider">Teach</Link>
+                )}
                 <div className="flex items-center space-x-4 pl-4 border-l border-white/10">
                   <div className="flex items-center space-x-2 group cursor-pointer">
                     <div className="w-9 h-9 rounded-lg glass-card flex items-center justify-center text-indigo-400 font-bold overflow-hidden shadow-sm group-hover:bg-indigo-500/20 transition-colors">
@@ -81,7 +83,9 @@ export function Navbar() {
                 {user ? (
                   <>
                     <Link to="/dashboard/student" className="text-slate-400 font-bold text-sm px-2 py-1 uppercase tracking-wider">My Learning</Link>
-                    <Link to="/dashboard/instructor" className="text-slate-400 font-bold text-sm px-2 py-1 uppercase tracking-wider">Teach</Link>
+                    {isInstructor && (
+                      <Link to="/dashboard/instructor" className="text-slate-400 font-bold text-sm px-2 py-1 uppercase tracking-wider">Teach</Link>
+                    )}
                     <button onClick={() => signOut()} className="text-red-400 font-bold text-sm px-2 py-1 text-left uppercase tracking-wider">Log out</button>
                   </>
                 ) : (

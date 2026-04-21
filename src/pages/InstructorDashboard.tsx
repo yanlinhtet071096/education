@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Link } from 'react-router-dom';
-import { Plus, Layout, BarChart, Settings, Play, Edit, Trash, Loader2, BookOpen } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Layout, BarChart, Settings, Play, Edit, Trash, Loader2, BookOpen, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateCourseModal } from '../components/CreateCourseModal';
 import { EditCourseModal } from '../components/EditCourseModal';
+import { MessagingSystem } from '../components/MessagingSystem';
 
 export function InstructorDashboard() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('courses');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -61,6 +63,12 @@ export function InstructorDashboard() {
   };
 
   useEffect(() => {
+    if (user && profile && profile.role === 'student') {
+      navigate('/dashboard/student');
+    }
+  }, [user, profile, navigate]);
+
+  useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
 
@@ -97,6 +105,7 @@ export function InstructorDashboard() {
         {[
           { id: 'courses', label: 'My Courses', icon: Layout },
           { id: 'performance', label: 'Performance', icon: BarChart },
+          { id: 'messages', label: 'Messages', icon: MessageSquare },
           { id: 'settings', label: 'Account Settings', icon: Settings },
         ].map((tab) => (
           <button
@@ -245,6 +254,10 @@ export function InstructorDashboard() {
             <h3 className="text-2xl font-black text-white leading-tight uppercase tracking-widest relative z-10">Growth Insights</h3>
             <p className="text-slate-500 max-w-sm mx-auto font-bold uppercase text-[10px] tracking-widest text-balance relative z-10">We're aggregating your sales and engagement data. Detailed charts will appear once you have your first active students.</p>
           </div>
+        )}
+
+        {activeTab === 'messages' && (
+          <MessagingSystem />
         )}
       </div>
 

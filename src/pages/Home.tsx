@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Star, Clock, Users, ChevronRight, BookOpen } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 interface Course {
   id: string;
@@ -66,6 +67,8 @@ const MOCK_COURSES: Course[] = [
 ];
 
 export function Home() {
+  const { user, isInstructor, isStudent } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
   const [loading, setLoading] = useState(false);
 
@@ -117,12 +120,20 @@ export function Home() {
             transition={{ delay: 0.2 }}
             className="flex flex-wrap gap-4"
           >
-            <button className="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold hover:scale-105 transition-all shadow-xl shadow-white/5">
+            <button 
+              onClick={() => navigate('/courses')}
+              className="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold hover:scale-105 transition-all shadow-xl shadow-white/5"
+            >
               Explore Courses
             </button>
-            <button className="glass-card text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all border-white/20">
-              Become Instructor
-            </button>
+            {!isStudent && (
+              <button 
+                onClick={() => navigate(user ? '/dashboard/instructor' : '/signup')}
+                className="glass-card text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition-all border-white/20"
+              >
+                {isInstructor ? 'Go to Studio' : 'Become Instructor'}
+              </button>
+            )}
           </motion.div>
         </div>
         

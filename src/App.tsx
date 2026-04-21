@@ -30,6 +30,7 @@ export default function App() {
                 <Route path="/dashboard/instructor" element={<InstructorDashboard />} />
                 <Route path="/instructor/course/:courseId/curriculum" element={<CurriculumManager />} />
                 <Route path="/dashboard/student" element={<StudentDashboard />} />
+                <Route path="/player/:courseId" element={<CoursePlayer />} />
                 <Route path="/player/:courseId/:lessonId" element={<CoursePlayer />} />
                 <Route path="/success" element={<Success />} />
               </Routes>

@@ -2,7 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Play, Users, Star, Clock, Globe, Award, ShieldCheck, ChevronRight, X } from 'lucide-react';
+import { CheckCircle2, Play, Users, Star, Clock, Globe, Award, ShieldCheck, ChevronRight, X, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -16,6 +16,8 @@ export function CourseDetail() {
   const [enrolling, setEnrolling] = useState(false);
   const [course, setCourse] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const isInstructor = user && course?.instructor_id === user.id;
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -29,6 +31,16 @@ export function CourseDetail() {
         .single();
 
       if (!error && data) {
+        // Step 1.5: Check if user is enrolled
+        if (user) {
+          const { data: enrollData } = await supabase
+            .from('enrollments')
+            .select('id')
+            .eq('course_id', id)
+            .eq('user_id', user.id)
+            .single();
+          if (enrollData) setIsEnrolled(true);
+        }
         // Step 2: Fetch modules
         const { data: moduleData } = await supabase
           .from('modules')
@@ -41,23 +53,25 @@ export function CourseDetail() {
           // Step 3: Fetch lessons for these modules
           const moduleIds = moduleData.map(m => m.id);
           if (moduleIds.length > 0) {
-            const fetchLessonsWithFallback = async (cols: string): Promise<any> => {
+            const fetchLessonsData = async () => {
               const { data, error } = await supabase
                 .from('lessons')
-                .select(cols)
+                .select('id, module_id, title, video_url, attachment_url, attachment_type, content, order, is_free')
                 .in('module_id', moduleIds)
                 .order('order', { ascending: true });
               
-              if (error && (error.code === 'PGRST204' || error.message?.includes('column'))) {
-                if (cols.includes('attachment_url')) {
-                  console.warn('Advanced columns missing, retrying with minimal set');
-                  return await fetchLessonsWithFallback('id, module_id, title, content, order, is_free');
-                }
+              if (error && (error.code === '42703' || error.message?.includes('column'))) {
+                const { data: fallbackData } = await supabase
+                  .from('lessons')
+                  .select('id, module_id, title, content, order, is_free')
+                  .in('module_id', moduleIds)
+                  .order('order', { ascending: true });
+                return fallbackData;
               }
-              return { data, error };
+              return data;
             };
 
-            const { data: lessonData, error: lessonError } = await fetchLessonsWithFallback('id, module_id, title, video_url, attachment_url, attachment_type, content, order, is_free');
+            const lessonData = await fetchLessonsData();
 
             if (lessonData) {
               formattedModules = moduleData.map(m => ({
@@ -242,26 +256,67 @@ export function CourseDetail() {
         {/* Course Content */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-white tracking-tight">Course content</h2>
-            <div className="text-[10px] text-slate-500 font-black font-mono uppercase tracking-widest">
+            <h2 className="text-2xl font-black text-white tracking-tight italic uppercase">Course curriculum</h2>
+            <div className="text-[10px] text-slate-500 font-black font-mono uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
               {course.modules.length} modules • {course.totalLessons} lessons
             </div>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-4">
             {course.modules.map((module, i) => (
-              <div key={i} className="glass-card rounded-2xl overflow-hidden hover:bg-white/5 transition-all">
-                <div className="p-5 flex items-center justify-between">
+              <div key={i} className="glass-panel rounded-3xl overflow-hidden border border-white/5 shadow-xl transition-all hover:bg-white/5">
+                <div className="p-6 flex items-center justify-between bg-white/[0.02]">
                   <div className="flex items-center space-x-4">
-                    <div className="bg-indigo-600/20 w-8 h-8 rounded-lg flex items-center justify-center font-black text-indigo-400 text-xs">
+                    <div className="bg-indigo-600/30 w-10 h-10 rounded-xl flex items-center justify-center font-black text-indigo-400 text-sm shadow-inner ring-1 ring-white/10">
                       {String(i + 1).padStart(2, '0')}
                     </div>
-                    <span className="font-bold text-slate-200">{module.title}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-bold font-mono tracking-tighter uppercase">
-                    {module.lessons?.length || 0} lessons
+                    <div>
+                      <h3 className="font-black text-white uppercase tracking-tight italic text-lg">{module.title}</h3>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{module.lessons?.length || 0} lessons</p>
+                    </div>
                   </div>
                 </div>
+                
+                {module.lessons && module.lessons.length > 0 && (
+                  <div className="px-6 pb-6 space-y-1">
+                    {module.lessons.map((lesson: any, lIndex: number) => (
+                      <div 
+                        key={lIndex} 
+                        className={`flex items-center justify-between p-4 rounded-2xl group/lesson transition-all ${
+                          isEnrolled || isInstructor 
+                            ? 'hover:bg-indigo-500/10 cursor-pointer' 
+                            : 'opacity-60'
+                        }`}
+                        onClick={() => {
+                          if (isEnrolled || isInstructor) navigate(`/player/${id}/${lesson.id}`);
+                        }}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-2 rounded-lg transition-colors ${
+                             isEnrolled || isInstructor ? 'bg-white/5 group-hover/lesson:bg-indigo-600 text-slate-400 group-hover/lesson:text-white' : 'bg-slate-800 text-slate-600'
+                          }`}>
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          </div>
+                          <span className={`text-sm font-bold transition-colors ${
+                            isEnrolled || isInstructor ? 'text-slate-300 group-hover/lesson:text-white' : 'text-slate-500'
+                          }`}>
+                            {lesson.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          {lesson.is_free && !isEnrolled && !isInstructor && (
+                            <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/10">Free Preview</span>
+                          )}
+                          {(isEnrolled || isInstructor) ? (
+                            <ChevronRight className="w-4 h-4 text-indigo-400 opacity-0 group-hover/lesson:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4 text-slate-600" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -303,23 +358,35 @@ export function CourseDetail() {
               </div>
 
               <div className="space-y-3">
-                <button 
-                  onClick={handleEnroll}
-                  disabled={enrolling}
-                  className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 uppercase tracking-widest text-xs"
-                >
-                  {enrolling ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <span>Enroll Now</span>
-                      <ChevronRight className="w-5 h-5" />
-                    </>
-                  )}
-                </button>
-                <button className="w-full glass-card text-white font-bold py-4 rounded-2xl hover:bg-white/10 transition-all border-white/5 uppercase tracking-widest text-xs">
-                  Add to Cart
-                </button>
+                {isInstructor ? (
+                  <button 
+                    onClick={() => navigate(`/instructor/course/${id}/curriculum`)}
+                    className="w-full bg-white text-indigo-900 font-black py-4 rounded-2xl shadow-xl shadow-white/10 hover:bg-slate-100 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 uppercase tracking-widest text-xs"
+                  >
+                    <Settings className="w-5 h-5" />
+                    <span>Manage Content</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={isEnrolled ? () => navigate(`/player/${id}`) : handleEnroll}
+                    disabled={enrolling}
+                    className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+                  >
+                    {enrolling ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>{isEnrolled ? 'Go to Course' : 'Enroll Now'}</span>
+                        <ChevronRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                )}
+                {!isInstructor && (
+                  <button className="w-full glass-card text-white font-bold py-4 rounded-2xl hover:bg-white/10 transition-all border-white/5 uppercase tracking-widest text-xs">
+                    Add to Cart
+                  </button>
+                )}
               </div>
 
               <div className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">
