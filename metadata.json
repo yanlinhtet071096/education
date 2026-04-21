@@ -1,0 +1,6 @@
+{
+  "name": "LearningX",
+  "description": "A comprehensive education platform inspired by Udemy, featuring video lessons, instructor dashboards, student progress tracking, and secure payments via Stripe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
