@@ -8,6 +8,8 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
+import { AssignmentBox } from '../components/AssignmentBox';
+
 export function CourseDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -240,19 +242,6 @@ export function CourseDetail() {
           </div>
         </section>
 
-        {/* What you'll learn */}
-        <section className="glass-panel rounded-3xl p-8 space-y-6 shadow-2xl">
-          <h2 className="text-2xl font-black text-white tracking-tight">What you'll learn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {course.outcomes.map((outcome, i) => (
-              <div key={i} className="flex items-start space-x-3 group">
-                <CheckCircle2 className="w-5 h-5 text-indigo-400 mt-1 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="text-slate-300 text-sm leading-relaxed">{outcome}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Course Content */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
@@ -263,7 +252,7 @@ export function CourseDetail() {
           </div>
           
           <div className="space-y-4">
-            {course.modules.map((module, i) => (
+            {course.modules.map((module: any, i: number) => (
               <div key={i} className="glass-panel rounded-3xl overflow-hidden border border-white/5 shadow-xl transition-all hover:bg-white/5">
                 <div className="p-6 flex items-center justify-between bg-white/[0.02]">
                   <div className="flex items-center space-x-4">
@@ -321,9 +310,10 @@ export function CourseDetail() {
             ))}
           </div>
         </section>
-      </div>
 
-      {/* Right Column: Checkout Card */}
+        {/* Assignments Box */}
+        <AssignmentBox courseId={id!} isInstructor={isInstructor} />
+      </div>
       <div className="relative">
         <div className="sticky top-24 space-y-6">
           <motion.div 

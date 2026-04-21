@@ -13,20 +13,27 @@ import {
   Download, 
   ExternalLink,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import Markdown from 'react-markdown';
 import { CourseDiscussions } from '../components/CourseDiscussions';
+import { SecurityGuard } from '../components/SecurityGuard';
+import { AssignmentBox } from '../components/AssignmentBox';
+import { useAuth } from '../context/AuthContext';
 
 export function CoursePlayer() {
   const { courseId, lessonId } = useParams();
+  const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<any>(null);
   const [currentLesson, setCurrentLesson] = useState<any>(null);
+
+  const isInstructor = user && course?.instructor_id === user.id;
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -136,7 +143,8 @@ export function CoursePlayer() {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#0f172a] flex flex-col md:flex-row h-screen">
+    <SecurityGuard>
+      <div className="fixed inset-0 z-[60] bg-[#0f172a] flex flex-col md:flex-row h-screen">
       {/* Sidebar (Curriculum) */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -268,6 +276,7 @@ export function CoursePlayer() {
                 {[
                   { id: 'overview', label: 'Overview', icon: Info },
                   { id: 'notes', label: 'Notes', icon: ClipboardList },
+                  { id: 'assignments', label: 'Assignments', icon: BookOpen },
                   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
                 ].map((tab) => (
                   <button
@@ -375,11 +384,18 @@ export function CoursePlayer() {
                 {activeTab === 'discussions' && (
                   <CourseDiscussions courseId={courseId!} instructorId={course.instructor_id} />
                 )}
+
+                {activeTab === 'assignments' && (
+                  <div className="space-y-8 pb-20">
+                    <AssignmentBox courseId={courseId!} isInstructor={isInstructor} />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+    </SecurityGuard>
   );
 }

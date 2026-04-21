@@ -307,6 +307,37 @@ DROP POLICY IF EXISTS "Users can update their own discussions" ON public.course_
 CREATE POLICY "Users can update their own discussions" ON public.course_discussions
   FOR UPDATE USING (auth.uid() = user_id);
 
+-- 9. Create Assignments table
+CREATE TABLE IF NOT EXISTS public.assignments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  file_url TEXT,
+  due_date TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS for assignments
+ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
+
+-- Assignments Policies
+DROP POLICY IF EXISTS "Assignments are viewable by everyone" ON public.assignments;
+CREATE POLICY "Assignments are viewable by everyone" ON public.assignments
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Instructors can manage their own assignments" ON public.assignments;
+CREATE POLICY "Instructors can manage their own assignments" ON public.assignments
+  FOR ALL 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.courses 
+      WHERE courses.id = public.assignments.course_id AND courses.instructor_id = auth.uid()
+    ) OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
 -- Private messages table
 CREATE TABLE IF NOT EXISTS public.private_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
